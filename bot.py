@@ -14,7 +14,7 @@ HEADERS = {
     "Accept-Language": "tr-TR,tr;q=0.9,en;q=0.8",
 }
 
-SENT = set()  # aynı fırsatı tekrar yollamamak için (container resetlenirse sıfırlanır)
+SENT = set()
 
 def send_msg(title, price, pct_off, link, img=None, source=""):
     if not (BOT_TOKEN and CHAT_ID):
@@ -74,7 +74,6 @@ def get_amazon_tr():
 
 # ---------- Trendyol ----------
 def get_trendyol():
-    # Basit liste sayfası: bazı dönemlerde çalışır, bazen sınırlı döner
     url = "https://www.trendyol.com/sr?tag=Indirimli-Urunler"
     out = []
     try:
@@ -131,7 +130,6 @@ def get_hepsiburada():
     return out
 
 def bot_loop():
-    # başlangıç mesajı
     try:
         requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
                       data={"chat_id": CHAT_ID, "text": f"✅ Bot aktif. {INTERVAL_SEC//60} dk aralıkla, %{MIN_PCT}+ indirimleri tarıyorum."})
@@ -142,12 +140,9 @@ def bot_loop():
         try:
             print("Tarama başladı...")
             all_items = []
-            for source, title, price, pct_off, link, img in get_amazon_tr():
-                all_items.append((source, title, price, pct_off, link, img))
-            for source, title, price, pct_off, link, img in get_trendyol():
-                all_items.append((source, title, price, pct_off, link, img))
-            for source, title, price, pct_off, link, img in get_hepsiburada():
-                all_items.append((source, title, price, pct_off, link, img))
+            all_items += get_amazon_tr()
+            all_items += get_trendyol()
+            all_items += get_hepsiburada()
 
             for source, title, price, pct_off, link, img in all_items:
                 key = f"{source}|{link}"
@@ -160,7 +155,7 @@ def bot_loop():
             print("Loop err:", e)
         time.sleep(INTERVAL_SEC)
 
-# ====== Flask - sahte web ucu (Render Free için) ======
+# ====== Flask - Render için ======
 app = Flask(__name__)
 
 @app.get("/")
@@ -172,19 +167,6 @@ def health():
     return jsonify({"status": "ok"})
 
 if __name__ == "__main__":
-    # Bot arka planda
     Thread(target=bot_loop, daemon=True).start()
-    # Render Free: portu bağla
     port = int(os.environ.get("PORT", "10000"))
     app.run(host="0.0.0.0", port=port)
-
-from flask import Flask
-
-app = Flask(__name__)
-
-@app.route('/')
-def home():
-    return "Amazon Bot is running!"
-
-if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=10000)
